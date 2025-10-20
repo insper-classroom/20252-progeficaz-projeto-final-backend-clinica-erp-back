@@ -1,0 +1,11 @@
+# Copie este conteúdo para um arquivo chamado .env na raiz do projeto lia_bot/
+
+GOOGLE_API_KEY=sua_chave_do_gemini_aqui
+
+# Para obter uma chave da API:
+# 1. Acesse: https://makersuite.google.com/app/apikey
+# 2. Crie uma nova chave de API
+# 3. Copie a chave e substitua "sua_chave_do_gemini_aqui" acima
+# 4. Salve o arquivo como .env (sem extensão)
+
+# Modelo configurado: Gemini 2.5 Flash
