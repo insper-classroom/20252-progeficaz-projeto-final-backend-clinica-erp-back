@@ -331,3 +331,4 @@ datasets/
 # Temporary files
 *.tmp
 *.temp
+.cred
