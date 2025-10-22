@@ -41,7 +41,7 @@ def get_medicos():
         return {"erro": f"Erro ao consultar médicos: {str(e)}"}, 500
     
 @app.route('/medicos/<string:id>', methods=['GET'])
-def get_medico_id():
+def get_medico_id(id):
     db = connect_db()
     if db is None:
         return {"erro": "Erro ao conectar ao banco de dados"}, 500
