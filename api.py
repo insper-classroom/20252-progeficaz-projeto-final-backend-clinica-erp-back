@@ -60,7 +60,88 @@ def get_medico_id():
         return {"medico": medico}, 200
     except Exception as e:
         return {"erro": f"Erro ao consultar médico: {str(e)}"}, 500
+@app.route('/medicos', methods=['POST'])
+def post_medico():
+    db = connect_db()
+    if db is None:
+        return {"erro": "Erro ao conectar ao banco de dados"}, 500
 
+    try:
+        dados = request.get_json()
+
+        campos_obrigatorios = ["nome", "cpf", "crm", "especialidade"]
+        for campo in campos_obrigatorios:
+            if campo not in dados or not dados[campo]:
+                return {"erro": f"Campo '{campo}' é obrigatório"}, 400
+
+        collection = db['medicos']
+
+        if collection.find_one({"cpf": dados["cpf"]}):
+            return {"erro": "Já existe um médico com esse CPF"}, 400
+        if collection.find_one({"crm": dados["crm"]}):
+            return {"erro": "Já existe um médico com esse CRM"}, 400
+
+        novo_medico = {
+            "nome": dados["nome"],
+            "cpf": dados["cpf"],
+            "crm": dados["crm"],
+            "especialidade": dados["especialidade"],
+            "horarios": {} 
+        }
+
+        resultado = collection.insert_one(novo_medico)
+
+        return {
+            "mensagem": "Médico criado com sucesso",
+            "id": str(resultado.inserted_id)
+        }, 201
+
+    except Exception as e:
+        return {"erro": f"Erro ao criar médico: {str(e)}"}, 500
+
+
+@app.route('/medicos/<id>', methods=['PUT'])
+def put_horarios(id):
+    db = connect_db()
+    if db is None:
+        return {"erro": "Erro ao conectar ao banco de dados"}, 500
+
+    try:
+        if not ObjectId.is_valid(id):
+            return {"erro": "ID inválido"}, 400
+
+        dados = request.get_json()
+        if not dados or not isinstance(dados, dict):
+            return {"erro": "O corpo da requisição deve ser um dicionário JSON"}, 400
+
+        collection = db['medicos']
+        medico = collection.find_one({"_id": ObjectId(id)})
+
+        if not medico:
+            return {"erro": "Médico não encontrado"}, 404
+
+        horarios_atualizados = medico.get("horarios", {})
+        for data, horarios in dados.items():
+            if not isinstance(horarios, dict):
+                return {"erro": f"Os horários da data '{data}' devem ser um dicionário"}, 400
+
+            if data not in horarios_atualizados:
+                horarios_atualizados[data] = {}
+
+            for hora, info in horarios.items():
+                if not isinstance(info, dict) or "status" not in info or "paciente" not in info:
+                    return {"erro": f"O horário '{hora}' em '{data}' deve conter 'status' e 'paciente'"}, 400
+                horarios_atualizados[data][hora] = info
+
+        collection.update_one(
+            {"_id": ObjectId(id)},
+            {"$set": {"horarios": horarios_atualizados}}
+        )
+
+        return {"mensagem": "Horários atualizados com sucesso"}, 200
+
+    except Exception as e:
+        return {"erro": f"Erro ao atualizar horários: {str(e)}"}, 500
     
     
 
