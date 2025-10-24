@@ -217,7 +217,7 @@ def post_paciente():
 
 
 @app.route('/pacientes/<paciente_id>', methods=['PUT'])
-def atualizar_consultas(paciente_id):
+def put_paciente(paciente_id):
     db = connect_db()
     if db is None:
         return {"erro": "Erro ao conectar ao banco de dados"}, 500
