@@ -143,6 +143,27 @@ def put_medico(id):
     except Exception as e:
         return {"erro": f"Erro ao atualizar horários: {str(e)}"}, 500
     
+@app.route('/medicos/<id>', methods=['DELETE'])
+def delete_medico(id):
+    db = connect_db()
+    if db is None:
+        return {"erro": "Erro ao conectar ao banco de dados"}, 500
+
+    try:
+        if not ObjectId.is_valid(id):
+            return {"erro": "ID inválido"}, 400
+
+        collection = db['medicos']
+        result = collection.delete_one({"_id": ObjectId(id)})
+
+        if result.deleted_count == 0:
+            return {"erro": "Médico não encontrado"}, 404
+
+        return {"mensagem": "Médico deletado com sucesso"}, 200
+
+    except Exception as e:
+        return {"erro": f"Erro ao deletar médico: {str(e)}"}, 500
+    
 # PACIENTES
 @app.route('/pacientes', methods=['GET'])
 def get_pacientes():
@@ -244,6 +265,25 @@ def put_paciente(paciente_id):
         return {"mensagem": "Consulta adicionada/atualizada com sucesso"}, 200
     except Exception as e:
         return {"erro": f"Erro ao atualizar consultas: {str(e)}"}, 500
+@app.route('/pacientes/<id>', methods=['DELETE'])
+def delete_paciente(id):
+    db = connect_db()
+    if db is None:
+        return {"erro": "Erro ao conectar ao banco de dados"}, 500
 
+    try:
+        if not ObjectId.is_valid(id):
+            return {"erro": "ID inválido"}, 400
+
+        collection = db['pacientes']
+        result = collection.delete_one({"_id": ObjectId(id)})
+
+        if result.deleted_count == 0:
+            return {"erro": "Paciente não encontrado"}, 404
+
+        return {"mensagem": "Paciente deletado com sucesso"}, 200
+
+    except Exception as e:
+        return {"erro": f"Erro ao deletar paciente: {str(e)}"}, 500
 if __name__ == '__main__':
     app.run(debug=True)
