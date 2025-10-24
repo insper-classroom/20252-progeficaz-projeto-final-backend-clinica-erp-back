@@ -101,7 +101,7 @@ def post_medico():
 
 
 @app.route('/medicos/<id>', methods=['PUT'])
-def put_horarios(id):
+def put_medico(id):
     db = connect_db()
     if db is None:
         return {"erro": "Erro ao conectar ao banco de dados"}, 500
@@ -143,8 +143,107 @@ def put_horarios(id):
     except Exception as e:
         return {"erro": f"Erro ao atualizar horários: {str(e)}"}, 500
     
-    
+# PACIENTES
+@app.route('/pacientes', methods=['GET'])
+def get_pacientes():
+    db = connect_db()
+    if db is None:
+        return {"erro": "Erro ao conectar ao banco de dados"}, 500
 
+    try:
+        collection = db['pacientes']
+        pacientes_cursor = collection.find()
+        pacientes = []
+        for p in pacientes_cursor:
+            p['_id'] = str(p['_id'])
+            pacientes.append(p)
+
+        if not pacientes:
+            return {"erro": "Nenhum paciente encontrado"}, 404
+        return {"pacientes": pacientes}, 200
+
+    except Exception as e:
+        return {"erro": f"Erro ao consultar pacientes: {str(e)}"}, 500
+
+
+@app.route('/pacientes/<paciente_id>', methods=['GET'])
+def get_paciente_id(paciente_id):
+    db = connect_db()
+    if db is None:
+        return {"erro": "Erro ao conectar ao banco de dados"}, 500
+
+    try:
+        collection = db['pacientes']
+        paciente = collection.find_one({"_id": ObjectId(paciente_id)})
+        if not paciente:
+            return {"erro": "Paciente não encontrado"}, 404
+
+        paciente['_id'] = str(paciente['_id'])
+        return {"paciente": paciente}, 200
+    except Exception as e:
+        return {"erro": f"Erro ao buscar paciente: {str(e)}"}, 500
+
+
+@app.route('/pacientes', methods=['POST'])
+def post_paciente():
+    db = connect_db()
+    if db is None:
+        return {"erro": "Erro ao conectar ao banco de dados"}, 500
+
+    try:
+        data = request.get_json()
+        nome = data.get('nome')
+        cpf = data.get('cpf')
+        celular = data.get('celular')
+        idade = data.get('idade')
+
+        if not all([nome, cpf, celular, idade]):
+            return {"erro": "Todos os campos (nome, cpf, celular, idade) são obrigatórios"}, 400
+
+        novo_paciente = {
+            "nome": nome,
+            "cpf": cpf,
+            "celular": celular,
+            "idade": idade,
+            "consultas": {}
+        }
+
+        collection = db['pacientes']
+        result = collection.insert_one(novo_paciente)
+
+        return {"mensagem": "Paciente cadastrado com sucesso", "id": str(result.inserted_id)}, 201
+    except Exception as e:
+        return {"erro": f"Erro ao cadastrar paciente: {str(e)}"}, 500
+
+
+@app.route('/pacientes/<paciente_id>', methods=['PUT'])
+def atualizar_consultas(paciente_id):
+    db = connect_db()
+    if db is None:
+        return {"erro": "Erro ao conectar ao banco de dados"}, 500
+
+    try:
+        data = request.get_json()
+        data_consulta = data.get("data")  
+        hora_consulta = data.get("hora")  
+        detalhes = data.get("detalhes")   
+
+        if not all([data_consulta, hora_consulta, detalhes]):
+            return {"erro": "Campos 'data', 'hora' e 'detalhes' são obrigatórios"}, 400
+
+        collection = db['pacientes']
+
+        result = collection.update_one(
+            {"_id": ObjectId(paciente_id)},
+            {"$set": {f"consultas.{data_consulta}.{hora_consulta}": detalhes}}
+        )
+
+        if result.matched_count == 0:
+            return {"erro": "Paciente não encontrado"}, 404
+
+        return {"mensagem": "Consulta adicionada/atualizada com sucesso"}, 200
+    except Exception as e:
+        return {"erro": f"Erro ao atualizar consultas: {str(e)}"}, 500
 
 if __name__ == '__main__':
     app.run(debug=True)
