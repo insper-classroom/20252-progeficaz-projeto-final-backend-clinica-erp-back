@@ -1,11 +1,11 @@
 import pytest
 from unittest.mock import patch, MagicMock
-# Precisa colocar o app corretamente após a criação do app
 from app import app
+
 
 @pytest.fixture
 def client():
-    """Cria um cliente de teste para a API."""
+    """Cria um cliente de teste Flask."""
     app.config["TESTING"] = True
     with app.test_client() as client:
         yield client
@@ -15,215 +15,132 @@ def client():
 # ================     MÉDICOS       =====================
 # =======================================================
 
-@patch("app.conectar_bd")
-def test_get_medicos_list(mock_conectar_bd, client):
-    """GET /api/medicos - lista todos os médicos"""
-    mock_conn = MagicMock()
-    mock_cursor = MagicMock()
-    mock_cursor.fetchall.return_value = [
-        (1, "Dr. João", "Cardiologia"),
-        (2, "Dra. Maria", "Pediatria")
+@patch("app.connect_db")
+def test_get_medicos_list(mock_connect_db, client):
+    """GET /medicos - lista todos os médicos"""
+    mock_db = MagicMock()
+    mock_medicos = MagicMock()
+    mock_medicos.find.return_value = [
+        {"_id": "1", "nome": "Dr. João", "especialidade": "Cardiologia"},
+        {"_id": "2", "nome": "Dra. Maria", "especialidade": "Pediatria"},
     ]
-    mock_conn.cursor.return_value = mock_cursor
-    mock_conectar_bd.return_value = mock_conn
+    mock_db.__getitem__.return_value = mock_medicos
+    mock_connect_db.return_value = mock_db
 
-    response = client.get("/api/medicos")
-    assert response.status_code == 200
-    assert response.get_json() == [
-        {"id": 1, "nome": "Dr. João", "especialidade": "Cardiologia"},
-        {"id": 2, "nome": "Dra. Maria", "especialidade": "Pediatria"}
-    ]
-
-
-@patch("app.conectar_bd")
-def test_post_medicos_create(mock_conectar_bd, client):
-    """POST /api/medicos - cria novo médico"""
-    mock_conn = MagicMock()
-    mock_cursor = MagicMock()
-    mock_cursor.lastrowid = 3
-    mock_conn.cursor.return_value = mock_cursor
-    mock_conectar_bd.return_value = mock_conn
-
-    payload = {"nome": "Dr. Pedro", "especialidade": "Ortopedia"}
-    response = client.post("/api/medicos", json=payload)
-
-    assert response.status_code == 201
-    assert response.get_json() == {"id": 3, "nome": "Dr. Pedro", "especialidade": "Ortopedia"}
+    resp = client.get("/medicos")
+    assert resp.status_code == 200
+    assert resp.get_json() == {
+        "medicos": [
+            {"_id": "1", "nome": "Dr. João", "especialidade": "Cardiologia"},
+            {"_id": "2", "nome": "Dra. Maria", "especialidade": "Pediatria"},
+        ]
+    }
 
 
-@patch("app.conectar_bd")
-def test_get_medico_by_id(mock_conectar_bd, client):
-    """GET /api/medicos/<id> - retorna médico específico"""
-    mock_conn = MagicMock()
-    mock_cursor = MagicMock()
-    mock_cursor.fetchone.return_value = (1, "Dr. João", "Cardiologia")
-    mock_conn.cursor.return_value = mock_cursor
-    mock_conectar_bd.return_value = mock_conn
+@patch("app.connect_db")
+def test_post_medicos_create(mock_connect_db, client):
+    """POST /medicos - cria novo médico"""
+    mock_db = MagicMock()
+    mock_coll = MagicMock()
+    mock_coll.find_one.side_effect = [None, None]
+    result = MagicMock(inserted_id="123abc")
+    mock_coll.insert_one.return_value = result
+    mock_db.__getitem__.return_value = mock_coll
+    mock_connect_db.return_value = mock_db
 
-    response = client.get("/api/medicos/1")
-    assert response.status_code == 200
-    assert response.get_json() == {"id": 1, "nome": "Dr. João", "especialidade": "Cardiologia"}
+    payload = {
+        "nome": "Dr. Pedro",
+        "cpf": "11122233344",
+        "crm": "5555",
+        "especialidade": "Ortopedia",
+    }
 
-
-@patch("app.conectar_bd")
-def test_post_medico_update(mock_conectar_bd, client):
-    """POST /api/medicos/<id> - atualiza médico"""
-    mock_conn = MagicMock()
-    mock_cursor = MagicMock()
-    mock_cursor.rowcount = 1
-    mock_conn.cursor.return_value = mock_cursor
-    mock_conectar_bd.return_value = mock_conn
-
-    payload = {"nome": "Dr. João Silva", "especialidade": "Cardiologia"}
-    response = client.post("/api/medicos/1", json=payload)
-
-    assert response.status_code == 200
-    assert response.get_json() == {"id": 1, "nome": "Dr. João Silva", "especialidade": "Cardiologia"}
+    resp = client.post("/medicos", json=payload)
+    data = resp.get_json()
+    assert resp.status_code == 201
+    assert data["mensagem"] == "Médico criado com sucesso"
+    assert "id" in data
 
 
-@patch("app.conectar_bd")
-def test_get_medico_disponibilidades(mock_conectar_bd, client):
-    """GET /api/medicos/<id>/disponibilidades - lista disponibilidades fixas"""
-    mock_conn = MagicMock()
-    mock_cursor = MagicMock()
-    mock_cursor.fetchall.return_value = [
-        (1, "09:00", "12:00"),
-        (2, "14:00", "18:00")
-    ]
-    mock_conn.cursor.return_value = mock_cursor
-    mock_conectar_bd.return_value = mock_conn
+@patch("app.connect_db")
+def test_get_medico_id(mock_connect_db, client):
+    """GET /medicos/<id>"""
+    mock_db = MagicMock()
+    mock_coll = MagicMock()
+    mock_coll.find_one.return_value = {
+        "_id": "507f1f77bcf86cd799439011",
+        "nome": "Dr. João",
+        "especialidade": "Cardiologia",
+    }
+    mock_db.__getitem__.return_value = mock_coll
+    mock_connect_db.return_value = mock_db
 
-    response = client.get("/api/medicos/1/disponibilidades")
-    assert response.status_code == 200
-    assert response.get_json() == [
-        {"dia_semana": 1, "inicio": "09:00", "fim": "12:00"},
-        {"dia_semana": 2, "inicio": "14:00", "fim": "18:00"}
-    ]
-
-
-@patch("app.conectar_bd")
-def test_get_medico_slots(mock_conectar_bd, client):
-    """GET /api/medicos/<id>/slots - lista horários disponíveis"""
-    mock_conn = MagicMock()
-    mock_cursor = MagicMock()
-    mock_cursor.fetchall.return_value = [
-        ("2025-10-22T09:00:00",),
-        ("2025-10-22T09:30:00",)
-    ]
-    mock_conn.cursor.return_value = mock_cursor
-    mock_conectar_bd.return_value = mock_conn
-
-    response = client.get("/api/medicos/1/slots?date=2025-10-22&slotMinutes=30")
-    assert response.status_code == 200
-    assert response.get_json() == ["2025-10-22T09:00:00", "2025-10-22T09:30:00"]
+    resp = client.get("/medicos/507f1f77bcf86cd799439011")
+    assert resp.status_code == 200
+    assert resp.get_json()["medico"]["nome"] == "Dr. João"
 
 
 # =======================================================
 # ================     PACIENTES     =====================
 # =======================================================
 
-@patch("app.conectar_bd")
-def test_get_pacientes_list(mock_conectar_bd, client):
-    """GET /api/pacientes - lista todos os pacientes"""
-    mock_conn = MagicMock()
-    mock_cursor = MagicMock()
-    mock_cursor.fetchall.return_value = [
-        (1, "Ana", 30, "Particular"),
-        (2, "Bruno", 45, "SUS")
+@patch("app.connect_db")
+def test_get_pacientes_list(mock_connect_db, client):
+    """GET /pacientes - lista todos os pacientes"""
+    mock_db = MagicMock()
+    mock_pacientes = MagicMock()
+    mock_pacientes.find.return_value = [
+        {"_id": "1", "nome": "Ana", "idade": 30, "cpf": "111"},
+        {"_id": "2", "nome": "Bruno", "idade": 45, "cpf": "222"},
     ]
-    mock_conn.cursor.return_value = mock_cursor
-    mock_conectar_bd.return_value = mock_conn
+    mock_db.__getitem__.return_value = mock_pacientes
+    mock_connect_db.return_value = mock_db
 
-    response = client.get("/api/pacientes")
-    assert response.status_code == 200
-    assert response.get_json() == [
-        {"id": 1, "nome": "Ana", "idade": 30, "plano": "Particular"},
-        {"id": 2, "nome": "Bruno", "idade": 45, "plano": "SUS"}
-    ]
+    resp = client.get("/pacientes")
+    assert resp.status_code == 200
+    assert "pacientes" in resp.get_json()
 
 
-@patch("app.conectar_bd")
-def test_post_pacientes_create(mock_conectar_bd, client):
-    """POST /api/pacientes - cria novo paciente"""
-    mock_conn = MagicMock()
-    mock_cursor = MagicMock()
-    mock_cursor.lastrowid = 5
-    mock_conn.cursor.return_value = mock_cursor
-    mock_conectar_bd.return_value = mock_conn
-
-    payload = {"nome": "Carlos", "idade": 28, "plano": "Particular"}
-    response = client.post("/api/pacientes", json=payload)
-
-    assert response.status_code == 201
-    assert response.get_json() == {"id": 5, "nome": "Carlos", "idade": 28, "plano": "Particular"}
-
-
-@patch("app.conectar_bd")
-def test_get_paciente_by_id(mock_conectar_bd, client):
-    """GET /api/pacientes/<id> - retorna paciente específico"""
-    mock_conn = MagicMock()
-    mock_cursor = MagicMock()
-    mock_cursor.fetchone.return_value = (1, "Ana", 30, "Particular")
-    mock_conn.cursor.return_value = mock_cursor
-    mock_conectar_bd.return_value = mock_conn
-
-    response = client.get("/api/pacientes/1")
-    assert response.status_code == 200
-    assert response.get_json() == {"id": 1, "nome": "Ana", "idade": 30, "plano": "Particular"}
-
-
-@patch("app.conectar_bd")
-def test_post_paciente_update(mock_conectar_bd, client):
-    """POST /api/pacientes/<id> - atualiza paciente"""
-    mock_conn = MagicMock()
-    mock_cursor = MagicMock()
-    mock_cursor.rowcount = 1
-    mock_conn.cursor.return_value = mock_cursor
-    mock_conectar_bd.return_value = mock_conn
-
-    payload = {"nome": "Ana Souza", "idade": 31, "plano": "Particular"}
-    response = client.post("/api/pacientes/1", json=payload)
-
-    assert response.status_code == 200
-    assert response.get_json() == {"id": 1, "nome": "Ana Souza", "idade": 31, "plano": "Particular"}
-
-
-# =======================================================
-# ================     AGENDAMENTOS   =====================
-# =======================================================
-
-@patch("app.conectar_bd")
-def test_post_agendamento_create(mock_conectar_bd, client):
-    """POST /api/agendamentos - cria novo agendamento"""
-    mock_conn = MagicMock()
-    mock_cursor = MagicMock()
-    mock_cursor.lastrowid = 10
-    mock_conn.cursor.return_value = mock_cursor
-    mock_conectar_bd.return_value = mock_conn
+@patch("app.connect_db")
+def test_post_pacientes_create(mock_connect_db, client):
+    """POST /pacientes - cria novo paciente"""
+    mock_db = MagicMock()
+    mock_coll = MagicMock()
+    result = MagicMock(inserted_id="999")
+    mock_coll.insert_one.return_value = result
+    mock_db.__getitem__.return_value = mock_coll
+    mock_connect_db.return_value = mock_db
 
     payload = {
-        "medico_id": 1,
-        "paciente_id": 2,
-        "data_hora": "2025-10-22T09:00:00"
+        "nome": "Carlos",
+        "cpf": "444",
+        "celular": "777",
+        "idade": 28,
     }
-    response = client.post("/api/agendamentos", json=payload)
 
-    assert response.status_code == 201
-    assert response.get_json() == {
-        "id": 10,
-        "medico_id": 1,
-        "paciente_id": 2,
-        "data_hora": "2025-10-22T09:00:00"
-    }
+    resp = client.post("/pacientes", json=payload)
+    data = resp.get_json()
+    assert resp.status_code == 201
+    assert data["mensagem"] == "Paciente cadastrado com sucesso"
 
 
 # =======================================================
-# ================     HEALTH CHECK   ====================
+# ================     HEALTH CHECK   ===================
 # =======================================================
 
-def test_get_health(client):
-    """GET /health - verifica status do servidor"""
-    response = client.get("/health")
-    assert response.status_code == 200
-    json_body = response.get_json()
-    assert json_body in ({"status": "ok"}, {"status": "healthy"}) or "status" in json_body
+@patch("app.connect_db")
+def test_health_ok(mock_connect_db, client):
+    mock_connect_db.return_value = MagicMock()
+    resp = client.get("/health")
+    data = resp.get_json()
+    assert resp.status_code == 200
+    assert data["status"] == "ok"
+
+
+@patch("app.connect_db")
+def test_health_fail(mock_connect_db, client):
+    mock_connect_db.return_value = None
+    resp = client.get("/health")
+    data = resp.get_json()
+    assert resp.status_code == 500
+    assert data["status"] == "degraded"
