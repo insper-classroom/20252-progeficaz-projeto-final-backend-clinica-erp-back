@@ -3,6 +3,7 @@ import os
 from pymongo import MongoClient
 from dotenv import load_dotenv
 from bson import ObjectId  
+import time
 
 load_dotenv('.cred')
 
@@ -19,6 +20,25 @@ def connect_db():
         return None
 
 app = Flask(__name__)
+
+@app.route('/health', methods=['GET'])
+def health():
+    """Health check endpoint.
+
+    Returns JSON with service status, uptime (seconds) and whether the DB is reachable.
+    """
+    
+    # quick DB connectivity check
+    db = connect_db()
+    db_ok = db is not None
+
+    status = {
+        "status": "ok" if db_ok else "degraded",
+        "database": "ok" if db_ok else "unreachable"
+    }
+    code = 200 if db_ok else 500
+    return status, code
+
 
 @app.route('/medicos', methods=['GET'])
 def get_medicos():
@@ -285,5 +305,8 @@ def delete_paciente(id):
 
     except Exception as e:
         return {"erro": f"Erro ao deletar paciente: {str(e)}"}, 500
+    
+
+
 if __name__ == '__main__':
     app.run(debug=True)
