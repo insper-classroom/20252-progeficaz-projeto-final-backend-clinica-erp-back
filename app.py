@@ -254,7 +254,7 @@ def post_paciente():
 
         return {"mensagem": "Paciente cadastrado com sucesso", "id": str(result.inserted_id)}, 201
     except Exception as e:
-        return {"erro": f"Erro ao cadastrar paciente: {str(e)}"}, 500
+        return {"erro": f"Erro ao cadastrar pacient ,.l´ç76e: {str(e)}"}, 500
 
 
 @app.route('/pacientes/<paciente_id>', methods=['PUT'])
