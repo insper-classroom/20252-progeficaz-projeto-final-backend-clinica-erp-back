@@ -148,7 +148,7 @@ def test_get_paciente_id(mock_connect_db, client):
     mock_db = MagicMock()
     mock_coll = MagicMock()
     mock_coll.find_one.return_value = {
-        "_id": "1",
+        "_id": "507f1f77bcf86cd799439011",
         "nome": "Ana",
         "idade": 30,
         "cpf": "111",
@@ -157,7 +157,8 @@ def test_get_paciente_id(mock_connect_db, client):
     mock_db.__getitem__.return_value = mock_coll
     mock_connect_db.return_value = mock_db
 
-    resp = client.get("/pacientes/1")
+    # usa um ObjectId válido de 24 caracteres
+    resp = client.get("/pacientes/507f1f77bcf86cd799439011")
     assert resp.status_code == 200
     assert resp.get_json()["paciente"]["nome"] == "Ana"
 
