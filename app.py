@@ -27,7 +27,7 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 def health():
     """Health check endpoint.
 
-    Returns JSON with service status, uptime (seconds) and whether the DB is reachable.
+    Returns JSON with service status and whether the DB is reachable.
     """
     
     # quick DB connectivity check

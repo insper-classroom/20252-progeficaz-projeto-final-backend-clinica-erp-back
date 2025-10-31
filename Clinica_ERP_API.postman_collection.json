@@ -1,0 +1,614 @@
+{
+	"info": {
+		"_postman_id": "clinica-erp-api-collection",
+		"name": "Clinica ERP API",
+		"description": "Collection completa para testar a API de gerenciamento de clínicas médicas",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:5000",
+			"type": "string"
+		},
+		{
+			"key": "medico_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "paciente_id",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Health Check",
+			"item": [
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/health",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"health"
+							]
+						},
+						"description": "Verifica o status da API e conectividade com o banco de dados"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Médicos",
+			"item": [
+				{
+					"name": "Listar Médicos",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/medicos",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"medicos"
+							]
+						},
+						"description": "Lista todos os médicos cadastrados"
+					},
+					"response": []
+				},
+				{
+					"name": "Buscar Médico por ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/medicos/{{medico_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"medicos",
+								"{{medico_id}}"
+							]
+						},
+						"description": "Busca um médico específico por ID"
+					},
+					"response": []
+				},
+				{
+					"name": "Criar Médico",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Response has message and id\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('mensagem');",
+									"    pm.expect(jsonData).to.have.property('id');",
+									"});",
+									"",
+									"if (pm.response.code === 201) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.collectionVariables.set(\"medico_id\", jsonData.id);",
+									"    console.log(\"Médico ID salvo: \" + jsonData.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nome\": \"Dra. Ana Martins\",\n  \"cpf\": \"123.456.789-00\",\n  \"crm\": \"123456-SP\",\n  \"especialidade\": \"Cardiologia\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/medicos",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"medicos"
+							]
+						},
+						"description": "Cadastra um novo médico"
+					},
+					"response": []
+				},
+				{
+					"name": "Atualizar Médico",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nome\": \"Dra. Ana Martins Silva\",\n  \"especialidade\": \"Cardiologia Clínica\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/medicos/{{medico_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"medicos",
+								"{{medico_id}}"
+							]
+						},
+						"description": "Atualiza dados de um médico existente"
+					},
+					"response": []
+				},
+				{
+					"name": "Deletar Médico",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/medicos/{{medico_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"medicos",
+								"{{medico_id}}"
+							]
+						},
+						"description": "Remove um médico do sistema"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Horários de Médicos",
+			"item": [
+				{
+					"name": "Listar Horários",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/medicos/{{medico_id}}/horarios",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"medicos",
+								"{{medico_id}}",
+								"horarios"
+							]
+						},
+						"description": "Lista todos os horários de um médico"
+					},
+					"response": []
+				},
+				{
+					"name": "Adicionar Horários",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"2025-11-05\": {\n    \"08:00\": {\n      \"status\": \"disponível\",\n      \"paciente\": \"nenhum\"\n    },\n    \"08:30\": {\n      \"status\": \"disponível\",\n      \"paciente\": \"nenhum\"\n    },\n    \"09:00\": {\n      \"status\": \"disponível\",\n      \"paciente\": \"nenhum\"\n    }\n  },\n  \"2025-11-06\": {\n    \"09:00\": {\n      \"status\": \"disponível\",\n      \"paciente\": \"nenhum\"\n    },\n    \"10:00\": {\n      \"status\": \"disponível\",\n      \"paciente\": \"nenhum\"\n    }\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/medicos/{{medico_id}}/horarios",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"medicos",
+								"{{medico_id}}",
+								"horarios"
+							]
+						},
+						"description": "Adiciona horários disponíveis para um médico"
+					},
+					"response": []
+				},
+				{
+					"name": "Atualizar Horário",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"data\": \"2025-11-05\",\n  \"hora\": \"08:00\",\n  \"info\": {\n    \"status\": \"ocupado\",\n    \"paciente\": \"Maria Santos\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/medicos/{{medico_id}}/horarios",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"medicos",
+								"{{medico_id}}",
+								"horarios"
+							]
+						},
+						"description": "Atualiza um horário específico sem alterar os demais"
+					},
+					"response": []
+				},
+				{
+					"name": "Remover Horário Específico",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"data\": \"2025-11-05\",\n  \"hora\": \"08:00\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/medicos/{{medico_id}}/horarios",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"medicos",
+								"{{medico_id}}",
+								"horarios"
+							]
+						},
+						"description": "Remove um horário específico"
+					},
+					"response": []
+				},
+				{
+					"name": "Remover Dia Inteiro",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"data\": \"2025-11-05\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/medicos/{{medico_id}}/horarios",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"medicos",
+								"{{medico_id}}",
+								"horarios"
+							]
+						},
+						"description": "Remove todos os horários de um dia"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Pacientes",
+			"item": [
+				{
+					"name": "Listar Pacientes",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/pacientes",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"pacientes"
+							]
+						},
+						"description": "Lista todos os pacientes cadastrados"
+					},
+					"response": []
+				},
+				{
+					"name": "Buscar Paciente por ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/pacientes/{{paciente_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"pacientes",
+								"{{paciente_id}}"
+							]
+						},
+						"description": "Busca um paciente específico por ID"
+					},
+					"response": []
+				},
+				{
+					"name": "Criar Paciente",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Response has message and id\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('mensagem');",
+									"    pm.expect(jsonData).to.have.property('id');",
+									"});",
+									"",
+									"if (pm.response.code === 201) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.collectionVariables.set(\"paciente_id\", jsonData.id);",
+									"    console.log(\"Paciente ID salvo: \" + jsonData.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nome\": \"Maria Santos\",\n  \"cpf\": \"111.222.333-44\",\n  \"celular\": \"(11) 99999-9999\",\n  \"idade\": 35\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/pacientes",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"pacientes"
+							]
+						},
+						"description": "Cadastra um novo paciente"
+					},
+					"response": []
+				},
+				{
+					"name": "Atualizar Paciente",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nome\": \"Maria Santos Silva\",\n  \"celular\": \"(11) 98888-8888\",\n  \"idade\": 36\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/pacientes/{{paciente_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"pacientes",
+								"{{paciente_id}}"
+							]
+						},
+						"description": "Atualiza dados de um paciente existente"
+					},
+					"response": []
+				},
+				{
+					"name": "Deletar Paciente",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/pacientes/{{paciente_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"pacientes",
+								"{{paciente_id}}"
+							]
+						},
+						"description": "Remove um paciente do sistema"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Consultas de Pacientes",
+			"item": [
+				{
+					"name": "Listar Consultas",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/pacientes/{{paciente_id}}/consultas",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"pacientes",
+								"{{paciente_id}}",
+								"consultas"
+							]
+						},
+						"description": "Lista todas as consultas de um paciente"
+					},
+					"response": []
+				},
+				{
+					"name": "Adicionar Consultas",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"2025-11-05\": {\n    \"08:00\": {\n      \"medico\": \"Dra. Ana Martins\",\n      \"especialidade\": \"Cardiologia\",\n      \"status\": \"confirmado\"\n    }\n  },\n  \"2025-11-12\": {\n    \"10:00\": {\n      \"medico\": \"Dr. João Silva\",\n      \"especialidade\": \"Dermatologia\",\n      \"status\": \"confirmado\"\n    }\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/pacientes/{{paciente_id}}/consultas",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"pacientes",
+								"{{paciente_id}}",
+								"consultas"
+							]
+						},
+						"description": "Adiciona consultas para um paciente"
+					},
+					"response": []
+				},
+				{
+					"name": "Atualizar Consulta",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"data\": \"2025-11-05\",\n  \"hora\": \"08:00\",\n  \"detalhes\": {\n    \"medico\": \"Dra. Ana Martins\",\n    \"especialidade\": \"Cardiologia\",\n    \"status\": \"realizado\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/pacientes/{{paciente_id}}/consultas",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"pacientes",
+								"{{paciente_id}}",
+								"consultas"
+							]
+						},
+						"description": "Atualiza uma consulta específica sem alterar as demais"
+					},
+					"response": []
+				},
+				{
+					"name": "Remover Consulta Específica",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"data\": \"2025-11-05\",\n  \"hora\": \"08:00\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/pacientes/{{paciente_id}}/consultas",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"pacientes",
+								"{{paciente_id}}",
+								"consultas"
+							]
+						},
+						"description": "Remove uma consulta específica"
+					},
+					"response": []
+				},
+				{
+					"name": "Remover Dia Inteiro de Consultas",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"data\": \"2025-11-05\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/pacientes/{{paciente_id}}/consultas",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"pacientes",
+								"{{paciente_id}}",
+								"consultas"
+							]
+						},
+						"description": "Remove todas as consultas de um dia"
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}
