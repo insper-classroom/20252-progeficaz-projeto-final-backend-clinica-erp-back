@@ -12,8 +12,8 @@ import time
 
 load_dotenv('.cred')
 
-mongo_uri = os.getenv('MONGO_URI', 'mongodb://localhost:27017/')
-db_name = os.getenv('DB_NAME', 'clinica')
+mongo_uri = os.getenv('MONGO_URI')
+db_name = os.getenv('DB_NAME')
 
 def connect_db():
     try:
