@@ -43,7 +43,6 @@ def health():
 
     status = {
         "status": "ok" if db_ok else "degraded",
-        "database": "ok" if db_ok else "unreachable"
     }
     code = 200 if db_ok else 500
     return status, code
@@ -186,8 +185,14 @@ def put_medico(id):
             return {"erro": "ID inválido"}, 400
 
         dados = request.get_json()
-        if not dados or not isinstance(dados, dict):
-            return {"erro": "O corpo da requisição deve ser um dicionário JSON"}, 400
+        if not dados:
+            return {"erro": "O corpo da requisição deve conter os dados do médico"}, 400
+
+        campos_validos = ["nome", "cpf", "crm", "especialidade"]
+        atualizacoes = {k: v for k, v in dados.items() if k in campos_validos}
+
+        if not atualizacoes:
+            return {"erro": "Nenhum campo válido para atualização"}, 400
 
         collection = db['medicos']
         medico = collection.find_one({"_id": ObjectId(id)})
@@ -195,28 +200,16 @@ def put_medico(id):
         if not medico:
             return {"erro": "Médico não encontrado"}, 404
 
-        horarios_atualizados = medico.get("horarios", {})
-        for data, horarios in dados.items():
-            if not isinstance(horarios, dict):
-                return {"erro": f"Os horários da data '{data}' devem ser um dicionário"}, 400
-
-            if data not in horarios_atualizados:
-                horarios_atualizados[data] = {}
-
-            for hora, info in horarios.items():
-                if not isinstance(info, dict) or "status" not in info or "paciente" not in info:
-                    return {"erro": f"O horário '{hora}' em '{data}' deve conter 'status' e 'paciente'"}, 400
-                horarios_atualizados[data][hora] = info
-
         collection.update_one(
             {"_id": ObjectId(id)},
-            {"$set": {"horarios": horarios_atualizados}}
+            {"$set": atualizacoes}
         )
 
-        return {"mensagem": "Horários atualizados com sucesso"}, 200
+        return {"mensagem": "Dados do médico atualizados com sucesso"}, 200
 
     except Exception as e:
-        return {"erro": f"Erro ao atualizar horários: {str(e)}"}, 500
+        return {"erro": f"Erro ao atualizar médico: {str(e)}"}, 500
+
     
 @app.route('/medicos/<id>', methods=['DELETE'])
 @jwt_required()
@@ -273,7 +266,7 @@ def get_paciente_id(paciente_id):
 
     try:
         collection = db['pacientes']
-        paciente = collection.find_one({"_id": ObjectId(paciente_id)})
+        paciente = collection.find_one({"_id": ObjectId(id)})
         if not paciente:
             return {"erro": "Paciente não encontrado"}, 404
 
@@ -324,27 +317,35 @@ def put_paciente(paciente_id):
         return {"erro": "Erro ao conectar ao banco de dados"}, 500
 
     try:
-        data = request.get_json()
-        data_consulta = data.get("data")  
-        hora_consulta = data.get("hora")  
-        detalhes = data.get("detalhes")   
 
-        if not all([data_consulta, hora_consulta, detalhes]):
-            return {"erro": "Campos 'data', 'hora' e 'detalhes' são obrigatórios"}, 400
+        if not ObjectId.is_valid(id):
+            return {"erro": "ID inválido"}, 400
+
+        dados = request.get_json()
+        if not dados:
+            return {"erro": "O corpo da requisição deve conter os dados do paciente"}, 400
+
+        campos_validos = ["nome", "cpf", "celular", "idade"]
+        atualizacoes = {k: v for k, v in dados.items() if k in campos_validos}
+
+        if not atualizacoes:
+            return {"erro": "Nenhum campo válido para atualização"}, 400
 
         collection = db['pacientes']
+        paciente = collection.find_one({"_id": ObjectId(id)})
 
-        result = collection.update_one(
-            {"_id": ObjectId(paciente_id)},
-            {"$set": {f"consultas.{data_consulta}.{hora_consulta}": detalhes}}
-        )
-
-        if result.matched_count == 0:
+        if not paciente:
             return {"erro": "Paciente não encontrado"}, 404
 
-        return {"mensagem": "Consulta adicionada/atualizada com sucesso"}, 200
+        collection.update_one(
+            {"_id": ObjectId(id)},
+            {"$set": atualizacoes}
+        )
+
+        return {"mensagem": "Dados do paciente atualizados com sucesso"}, 200
+
     except Exception as e:
-        return {"erro": f"Erro ao atualizar consultas: {str(e)}"}, 500
+        return {"erro": f"Erro ao atualizar paciente: {str(e)}"}, 500
 @app.route('/pacientes/<id>', methods=['DELETE'])
 @jwt_required()
 def delete_paciente(id):
@@ -366,7 +367,261 @@ def delete_paciente(id):
 
     except Exception as e:
         return {"erro": f"Erro ao deletar paciente: {str(e)}"}, 500
+
+# MÉDICOS - HORÁRIOS
+@app.route('/medicos/<id>/horarios', methods=['POST'])
+def post_horarios_medico(id):
+    """Cria novos horários (ou dias inteiros) para o médico"""
+    db = connect_db()
+    if db is None:
+        return {"erro": "Erro ao conectar ao banco de dados"}, 500
+
+    try:
+        if not ObjectId.is_valid(id):
+            return {"erro": "ID inválido"}, 400
+
+        dados = request.get_json()
+        if not dados or not isinstance(dados, dict):
+            return {"erro": "O corpo da requisição deve ser um dicionário JSON"}, 400
+
+        collection = db['medicos']
+        medico = collection.find_one({"_id": ObjectId(id)})
+
+        if not medico:
+            return {"erro": "Médico não encontrado"}, 404
+
+        horarios = medico.get("horarios", {})
+        for data, horarios_data in dados.items():
+            horarios[data] = horarios_data  # adiciona ou substitui o dia inteiro
+
+        collection.update_one(
+            {"_id": ObjectId(id)},
+            {"$set": {"horarios": horarios}}
+        )
+
+        return {"mensagem": "Horários adicionados com sucesso"}, 201
+
+    except Exception as e:
+        return {"erro": f"Erro ao criar horários: {str(e)}"}, 500
+
+
+@app.route('/medicos/<id>/horarios', methods=['GET'])
+def get_horarios_medico(id):
+    """Retorna todos os horários de um médico"""
+    db = connect_db()
+    if db is None:
+        return {"erro": "Erro ao conectar ao banco de dados"}, 500
+
+    try:
+        if not ObjectId.is_valid(id):
+            return {"erro": "ID inválido"}, 400
+
+        collection = db['medicos']
+        medico = collection.find_one({"_id": ObjectId(id)}, {"_id": 0, "horarios": 1})
+
+        if not medico:
+            return {"erro": "Médico não encontrado"}, 404
+
+        return {"horarios": medico.get("horarios", {})}, 200
+
+    except Exception as e:
+        return {"erro": f"Erro ao buscar horários: {str(e)}"}, 500
+
+
+@app.route('/medicos/<id>/horarios', methods=['PUT'])
+def put_horarios_medico(id):
+    """Atualiza apenas um horário específico sem alterar os demais"""
+    db = connect_db()
+    if db is None:
+        return {"erro": "Erro ao conectar ao banco de dados"}, 500
+
+    try:
+        if not ObjectId.is_valid(id):
+            return {"erro": "ID inválido"}, 400
+
+        dados = request.get_json()
+        data = dados.get("data")
+        hora = dados.get("hora")
+        info = dados.get("info")
+
+        if not all([data, hora, info]):
+            return {"erro": "Campos 'data', 'hora' e 'info' são obrigatórios"}, 400
+
+        collection = db['medicos']
+        result = collection.update_one(
+            {"_id": ObjectId(id)},
+            {"$set": {f"horarios.{data}.{hora}": info}}
+        )
+
+        if result.matched_count == 0:
+            return {"erro": "Médico não encontrado"}, 404
+
+        return {"mensagem": "Horário atualizado com sucesso"}, 200
+
+    except Exception as e:
+        return {"erro": f"Erro ao atualizar horário: {str(e)}"}, 500
+
+
+@app.route('/medicos/<id>/horarios', methods=['DELETE'])
+def delete_horarios_medico(id):
+    """Remove um horário específico ou um dia inteiro"""
+    db = connect_db()
+    if db is None:
+        return {"erro": "Erro ao conectar ao banco de dados"}, 500
+
+    try:
+        if not ObjectId.is_valid(id):
+            return {"erro": "ID inválido"}, 400
+
+        dados = request.get_json()
+        data = dados.get("data")
+        hora = dados.get("hora")
+
+        if not data:
+            return {"erro": "Campo 'data' é obrigatório"}, 400
+
+        collection = db['medicos']
+
+        if hora:
+            update = {"$unset": {f"horarios.{data}.{hora}": ""}}
+        else:
+            update = {"$unset": {f"horarios.{data}": ""}}
+
+        result = collection.update_one({"_id": ObjectId(id)}, update)
+
+        if result.matched_count == 0:
+            return {"erro": "Médico não encontrado"}, 404
+
+        return {"mensagem": "Horário removido com sucesso"}, 200
+
+    except Exception as e:
+        return {"erro": f"Erro ao deletar horário: {str(e)}"}, 500
     
+# PACIENTES -  CONSULTAS
+@app.route('/pacientes/<id>/consultas', methods=['POST'])
+def post_consultas_paciente(id):
+    db = connect_db()
+    if db is None:
+        return {"erro": "Erro ao conectar ao banco de dados"}, 500
+
+    try:
+        if not ObjectId.is_valid(id):
+            return {"erro": "ID inválido"}, 400
+
+        dados = request.get_json()
+        if not dados or not isinstance(dados, dict):
+            return {"erro": "O corpo da requisição deve ser um dicionário JSON"}, 400
+
+        collection = db['pacientes']
+        paciente = collection.find_one({"_id": ObjectId(id)})
+
+        if not paciente:
+            return {"erro": "Paciente não encontrado"}, 404
+
+        consultas = paciente.get("consultas", {})
+        for data, consultas_data in dados.items():
+            consultas[data] = consultas_data
+
+        collection.update_one(
+            {"_id": ObjectId(id)},
+            {"$set": {"consultas": consultas}}
+        )
+
+        return {"mensagem": "Consultas adicionadas com sucesso"}, 201
+
+    except Exception as e:
+        return {"erro": f"Erro ao criar consultas: {str(e)}"}, 500
+
+
+@app.route('/pacientes/<id>/consultas', methods=['GET'])
+def get_consultas_paciente(id):
+    db = connect_db()
+    if db is None:
+        return {"erro": "Erro ao conectar ao banco de dados"}, 500
+
+    try:
+        if not ObjectId.is_valid(id):
+            return {"erro": "ID inválido"}, 400
+
+        collection = db['pacientes']
+        paciente = collection.find_one({"_id": ObjectId(id)}, {"_id": 0, "consultas": 1})
+
+        if not paciente:
+            return {"erro": "Paciente não encontrado"}, 404
+
+        return {"consultas": paciente.get("consultas", {})}, 200
+
+    except Exception as e:
+        return {"erro": f"Erro ao buscar consultas: {str(e)}"}, 500
+
+
+@app.route('/pacientes/<id>/consultas', methods=['PUT'])
+def put_consultas_paciente(id):
+    db = connect_db()
+    if db is None:
+        return {"erro": "Erro ao conectar ao banco de dados"}, 500
+
+    try:
+
+        if not ObjectId.is_valid(id):
+            return {"erro": "ID inválido"}, 400
+
+        data = request.get_json()
+        data_consulta = data.get("data")
+        hora_consulta = data.get("hora")
+        detalhes = data.get("detalhes")
+
+        if not all([data_consulta, hora_consulta, detalhes]):
+            return {"erro": "Campos 'data', 'hora' e 'detalhes' são obrigatórios"}, 400
+
+        collection = db['pacientes']
+        result = collection.update_one(
+            {"_id": ObjectId(id)},
+            {"$set": {f"consultas.{data_consulta}.{hora_consulta}": detalhes}}
+        )
+
+        if result.matched_count == 0:
+            return {"erro": "Paciente não encontrado"}, 404
+
+        return {"mensagem": "Consulta atualizada com sucesso"}, 200
+
+    except Exception as e:
+        return {"erro": f"Erro ao atualizar consulta: {str(e)}"}, 500
+
+
+@app.route('/pacientes/<id>/consultas', methods=['DELETE'])
+def delete_consulta_paciente(id):
+    db = connect_db()
+    if db is None:
+        return {"erro": "Erro ao conectar ao banco de dados"}, 500
+
+    try:
+        if not ObjectId.is_valid(id):
+            return {"erro": "ID inválido"}, 400
+
+        dados = request.get_json()
+        data = dados.get("data")
+        hora = dados.get("hora")
+
+        if not data:
+            return {"erro": "Campo 'data' é obrigatório"}, 400
+
+        collection = db['pacientes']
+
+        if hora:
+            update = {"$unset": {f"consultas.{data}.{hora}": ""}}
+        else:
+            update = {"$unset": {f"consultas.{data}": ""}}
+
+        result = collection.update_one({"_id": ObjectId(id)}, update)
+
+        if result.matched_count == 0:
+            return {"erro": "Paciente não encontrado"}, 404
+
+        return {"mensagem": "Consulta removida com sucesso"}, 200
+
+    except Exception as e:
+        return {"erro": f"Erro ao deletar consulta: {str(e)}"}, 500
 
 
 if __name__ == '__main__':
