@@ -1,4 +1,5 @@
 from flask import Flask, request
+from flask_cors import CORS
 import os
 from pymongo import MongoClient
 from dotenv import load_dotenv
@@ -20,6 +21,7 @@ def connect_db():
         return None
 
 app = Flask(__name__)
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 @app.route('/health', methods=['GET'])
 def health():
@@ -34,7 +36,6 @@ def health():
 
     status = {
         "status": "ok" if db_ok else "degraded",
-        "database": "ok" if db_ok else "unreachable"
     }
     code = 200 if db_ok else 500
     return status, code
