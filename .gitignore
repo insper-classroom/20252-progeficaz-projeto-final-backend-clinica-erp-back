@@ -313,7 +313,6 @@ config.json
 
 # Data files (se muito grandes)
 *.csv
-*.json
 *.xlsx
 *.parquet
 data/
