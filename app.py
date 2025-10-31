@@ -1,4 +1,9 @@
 from flask import Flask, request
+from flask_cors import CORS
+from flask_jwt_extended import (
+    JWTManager, create_access_token, jwt_required, get_jwt_identity
+)
+from flask_bcrypt import Bcrypt
 import os
 from pymongo import MongoClient
 from dotenv import load_dotenv
@@ -20,6 +25,10 @@ def connect_db():
         return None
 
 app = Flask(__name__)
+CORS(app)
+app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY')
+jwt = JWTManager(app)
+bcrypt = Bcrypt(app)
 
 @app.route('/health', methods=['GET'])
 def health():
@@ -39,8 +48,51 @@ def health():
     code = 200 if db_ok else 500
     return status, code
 
+@app.route('/cadastro', methods=['POST'])
+def register():
+    db = connect_db()
+    if db is None:
+        return {"erro": "Erro ao conectar ao banco de dados"}, 500
+
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+
+    if not username or not password:
+        return {"erro": "Campos 'username' e 'password' são obrigatórios"}, 400
+
+    users = db['users']
+    if users.find_one({'username': username}):
+        return {"erro": "Usuário já existe"}, 400
+
+    hashed = bcrypt.generate_password_hash(password).decode('utf-8')
+    result = users.insert_one({'username': username, 'password': hashed})
+
+    return {"mensagem": "Usuário criado com sucesso", "id": str(result.inserted_id)}, 201
+
+@app.route('/login', methods=['POST'])
+def login():
+    db = connect_db()
+    if db is None:
+        return {"erro": "Erro ao conectar ao banco de dados"}, 500
+
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+
+    if not username or not password:
+        return {"erro": "Campos 'username' e 'password' são obrigatórios"}, 400
+
+    users = db['users']
+    user = users.find_one({'username': username})
+    if not user or not bcrypt.check_password_hash(user['password'], password):
+        return {"erro": "Usuário ou senha inválidos"}, 401
+
+    token = create_access_token(identity=username)
+    return {"token": token}, 200
 
 @app.route('/medicos', methods=['GET'])
+@jwt_required()
 def get_medicos():
     db = connect_db()
     if db is None:
@@ -61,6 +113,7 @@ def get_medicos():
         return {"erro": f"Erro ao consultar médicos: {str(e)}"}, 500
     
 @app.route('/medicos/<string:id>', methods=['GET'])
+@jwt_required()
 def get_medico_id(id):
     db = connect_db()
     if db is None:
@@ -81,6 +134,7 @@ def get_medico_id(id):
     except Exception as e:
         return {"erro": f"Erro ao consultar médico: {str(e)}"}, 500
 @app.route('/medicos', methods=['POST'])
+@jwt_required()
 def post_medico():
     db = connect_db()
     if db is None:
@@ -121,6 +175,7 @@ def post_medico():
 
 
 @app.route('/medicos/<id>', methods=['PUT'])
+@jwt_required()
 def put_medico(id):
     db = connect_db()
     if db is None:
@@ -164,6 +219,7 @@ def put_medico(id):
         return {"erro": f"Erro ao atualizar horários: {str(e)}"}, 500
     
 @app.route('/medicos/<id>', methods=['DELETE'])
+@jwt_required()
 def delete_medico(id):
     db = connect_db()
     if db is None:
@@ -186,6 +242,7 @@ def delete_medico(id):
     
 # PACIENTES
 @app.route('/pacientes', methods=['GET'])
+@jwt_required()
 def get_pacientes():
     db = connect_db()
     if db is None:
@@ -208,6 +265,7 @@ def get_pacientes():
 
 
 @app.route('/pacientes/<paciente_id>', methods=['GET'])
+@jwt_required()
 def get_paciente_id(paciente_id):
     db = connect_db()
     if db is None:
@@ -226,6 +284,7 @@ def get_paciente_id(paciente_id):
 
 
 @app.route('/pacientes', methods=['POST'])
+@jwt_required()
 def post_paciente():
     db = connect_db()
     if db is None:
@@ -258,6 +317,7 @@ def post_paciente():
 
 
 @app.route('/pacientes/<paciente_id>', methods=['PUT'])
+@jwt_required()
 def put_paciente(paciente_id):
     db = connect_db()
     if db is None:
@@ -286,6 +346,7 @@ def put_paciente(paciente_id):
     except Exception as e:
         return {"erro": f"Erro ao atualizar consultas: {str(e)}"}, 500
 @app.route('/pacientes/<id>', methods=['DELETE'])
+@jwt_required()
 def delete_paciente(id):
     db = connect_db()
     if db is None:
