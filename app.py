@@ -281,8 +281,11 @@ def get_paciente_id(paciente_id):
         return {"erro": "Erro ao conectar ao banco de dados"}, 500
 
     try:
+        if not ObjectId.is_valid(paciente_id):
+            return {"erro": "ID inválido"}, 400
+
         collection = db['pacientes']
-        paciente = collection.find_one({"_id": ObjectId(id)})
+        paciente = collection.find_one({"_id": ObjectId(paciente_id)})
         if not paciente:
             return {"erro": "Paciente não encontrado"}, 404
 
@@ -290,7 +293,6 @@ def get_paciente_id(paciente_id):
         return {"paciente": paciente}, 200
     except Exception as e:
         return {"erro": f"Erro ao buscar paciente: {str(e)}"}, 500
-
 
 @app.route('/pacientes', methods=['POST'])
 @jwt_required()
@@ -519,6 +521,7 @@ def delete_horarios_medico(id):
     
 # PACIENTES -  CONSULTAS
 @app.route('/pacientes/<id>/consultas', methods=['POST'])
+@jwt_required()
 def post_consultas_paciente(id):
     db = connect_db()
     if db is None:
@@ -554,6 +557,7 @@ def post_consultas_paciente(id):
 
 
 @app.route('/pacientes/<id>/consultas', methods=['GET'])
+@jwt_required()
 def get_consultas_paciente(id):
     db = connect_db()
     if db is None:
@@ -576,6 +580,7 @@ def get_consultas_paciente(id):
 
 
 @app.route('/pacientes/<id>/consultas', methods=['PUT'])
+@jwt_required()
 def put_consultas_paciente(id):
     db = connect_db()
     if db is None:
@@ -610,6 +615,7 @@ def put_consultas_paciente(id):
 
 
 @app.route('/pacientes/<id>/consultas', methods=['DELETE'])
+@jwt_required()
 def delete_consulta_paciente(id):
     db = connect_db()
     if db is None:
