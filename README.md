@@ -198,30 +198,7 @@ Content-Type: application/json
 }
 ```
 
-### Testes Automatizados
 
-Você pode adicionar scripts de teste no Postman para validar as respostas:
-
-```javascript
-// Exemplo de teste para POST /medicos
-pm.test("Status code is 201", function () {
-    pm.response.to.have.status(201);
-});
-
-pm.test("Response has message and id", function () {
-    var jsonData = pm.response.json();
-    pm.expect(jsonData).to.have.property('mensagem');
-    pm.expect(jsonData).to.have.property('id');
-});
-
-// Salvar o ID do médico criado
-if (pm.response.code === 201) {
-    var jsonData = pm.response.json();
-    pm.collectionVariables.set("medico_id", jsonData.id);
-}
-```
-
----
 
 ## Sumário de Endpoints
 

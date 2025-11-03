@@ -144,6 +144,7 @@ def health():
 
 # Médicos
 @app.route('/medicos', methods=['GET'])
+@token_required
 def get_medicos():
     db = connect_db()
     if db is None:
@@ -164,6 +165,7 @@ def get_medicos():
         return {"erro": f"Erro ao consultar médicos: {str(e)}"}, 500
     
 @app.route('/medicos/<string:id>', methods=['GET'])
+@token_required
 def get_medico_id(id):
     db = connect_db()
     if db is None:
@@ -184,6 +186,7 @@ def get_medico_id(id):
     except Exception as e:
         return {"erro": f"Erro ao consultar médico: {str(e)}"}, 500
 @app.route('/medicos', methods=['POST'])
+@token_required
 def post_medico():
     db = connect_db()
     if db is None:
@@ -224,6 +227,7 @@ def post_medico():
 
 
 @app.route('/medicos/<id>', methods=['PUT'])
+@token_required
 def put_medico(id):
     db = connect_db()
     if db is None:
@@ -261,6 +265,7 @@ def put_medico(id):
 
     
 @app.route('/medicos/<id>', methods=['DELETE'])
+@token_required
 def delete_medico(id):
     db = connect_db()
     if db is None:
@@ -283,6 +288,7 @@ def delete_medico(id):
     
 # PACIENTES
 @app.route('/pacientes', methods=['GET'])
+@token_required
 def get_pacientes():
     db = connect_db()
     if db is None:
@@ -305,6 +311,7 @@ def get_pacientes():
 
 
 @app.route('/pacientes/<id>', methods=['GET'])
+@token_required
 def get_paciente_id(id):
     db = connect_db()
     if db is None:
@@ -323,6 +330,7 @@ def get_paciente_id(id):
 
 
 @app.route('/pacientes', methods=['POST'])
+@token_required
 def post_paciente():
     db = connect_db()
     if db is None:
@@ -355,6 +363,7 @@ def post_paciente():
 
 
 @app.route('/pacientes/<id>', methods=['PUT'])
+@token_required
 def put_paciente(id):
     db = connect_db()
     if db is None:
@@ -391,6 +400,7 @@ def put_paciente(id):
     except Exception as e:
         return {"erro": f"Erro ao atualizar paciente: {str(e)}"}, 500
 @app.route('/pacientes/<id>', methods=['DELETE'])
+@token_required
 def delete_paciente(id):
     db = connect_db()
     if db is None:
@@ -413,6 +423,7 @@ def delete_paciente(id):
 
 # MÉDICOS - HORÁRIOS
 @app.route('/medicos/<id>/horarios', methods=['POST'])
+@token_required
 def post_horarios_medico(id):
     """Cria novos horários (ou dias inteiros) para o médico"""
     db = connect_db()
@@ -449,6 +460,7 @@ def post_horarios_medico(id):
 
 
 @app.route('/medicos/<id>/horarios', methods=['GET'])
+@token_required
 def get_horarios_medico(id):
     """Retorna todos os horários de um médico"""
     db = connect_db()
@@ -472,6 +484,7 @@ def get_horarios_medico(id):
 
 
 @app.route('/medicos/<id>/horarios', methods=['PUT'])
+@token_required
 def put_horarios_medico(id):
     """Atualiza apenas um horário específico sem alterar os demais"""
     db = connect_db()
@@ -506,6 +519,7 @@ def put_horarios_medico(id):
 
 
 @app.route('/medicos/<id>/horarios', methods=['DELETE'])
+@token_required
 def delete_horarios_medico(id):
     """Remove um horário específico ou um dia inteiro"""
     db = connect_db()
@@ -542,6 +556,7 @@ def delete_horarios_medico(id):
     
 # PACIENTES -  CONSULTAS
 @app.route('/pacientes/<id>/consultas', methods=['POST'])
+@token_required
 def post_consultas_paciente(id):
     db = connect_db()
     if db is None:
@@ -577,6 +592,7 @@ def post_consultas_paciente(id):
 
 
 @app.route('/pacientes/<id>/consultas', methods=['GET'])
+@token_required
 def get_consultas_paciente(id):
     db = connect_db()
     if db is None:
@@ -599,6 +615,7 @@ def get_consultas_paciente(id):
 
 
 @app.route('/pacientes/<id>/consultas', methods=['PUT'])
+@token_required
 def put_consultas_paciente(id):
     db = connect_db()
     if db is None:
@@ -633,6 +650,7 @@ def put_consultas_paciente(id):
 
 
 @app.route('/pacientes/<id>/consultas', methods=['DELETE'])
+@token_required
 def delete_consulta_paciente(id):
     db = connect_db()
     if db is None:
