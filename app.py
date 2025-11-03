@@ -1,5 +1,10 @@
+
 from flask import Flask, request
 from flask_cors import CORS
+from flask_jwt_extended import (
+    JWTManager, create_access_token, jwt_required, get_jwt_identity
+)
+from flask_bcrypt import Bcrypt
 import os
 from pymongo import MongoClient
 from dotenv import load_dotenv
@@ -8,8 +13,8 @@ import time
 
 load_dotenv('.cred')
 
-mongo_uri = os.getenv('MONGO_URI', 'mongodb://localhost:27017/')
-db_name = os.getenv('DB_NAME', 'clinica')
+mongo_uri = os.getenv('MONGO_URI')
+db_name = os.getenv('DB_NAME')
 
 def connect_db():
     try:
@@ -21,7 +26,11 @@ def connect_db():
         return None
 
 app = Flask(__name__)
+
 CORS(app, resources={r"/*": {"origins": "*"}})
+app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY')
+jwt = JWTManager(app)
+bcrypt = Bcrypt(app)
 
 @app.route('/health', methods=['GET'])
 def health():
@@ -40,8 +49,38 @@ def health():
     code = 200 if db_ok else 500
     return status, code
 
-# Médicos
+
+@app.route('/login', methods=['POST'])
+def admin_login():
+    """Login apenas para o admin/clinica. Retorna token JWT.
+
+    Corpo: { "username": "...", "password": "..." }
+    """
+    db = connect_db()
+    if db is None:
+        return {"erro": "Erro ao conectar ao banco de dados"}, 500
+
+    data = request.get_json() or {}
+    username = data.get('username')
+    password = data.get('password')
+
+    if not username or not password:
+        return {"erro": "Campos 'username' e 'password' são obrigatórios"}, 400
+
+    users = db['users']
+    user = users.find_one({'username': username})
+    if not user or not bcrypt.check_password_hash(user.get('password', ''), password):
+        return {"erro": "Usuário ou senha inválidos"}, 401
+
+    # Permitir login apenas para administradores
+    if user.get('role') != 'admin':
+        return {"erro": "Acesso permitido apenas para admin/clinica"}, 403
+
+    token = create_access_token(identity=username)
+    return {"token": token, "role": "admin"}, 200
+
 @app.route('/medicos', methods=['GET'])
+@jwt_required()
 def get_medicos():
     db = connect_db()
     if db is None:
@@ -62,6 +101,7 @@ def get_medicos():
         return {"erro": f"Erro ao consultar médicos: {str(e)}"}, 500
     
 @app.route('/medicos/<string:id>', methods=['GET'])
+@jwt_required()
 def get_medico_id(id):
     db = connect_db()
     if db is None:
@@ -82,10 +122,20 @@ def get_medico_id(id):
     except Exception as e:
         return {"erro": f"Erro ao consultar médico: {str(e)}"}, 500
 @app.route('/medicos', methods=['POST'])
+@jwt_required()
 def post_medico():
+    """Cria um novo médico. Apenas administradores podem criar médicos."""
+    # Verificar se o usuário é admin
+    current_user = get_jwt_identity()
     db = connect_db()
     if db is None:
         return {"erro": "Erro ao conectar ao banco de dados"}, 500
+
+    # Verificar role do usuário
+    users = db['users']
+    user = users.find_one({'username': current_user})
+    if not user or user.get('role') != 'admin':
+        return {"erro": "Apenas administradores podem criar médicos"}, 403
 
     try:
         dados = request.get_json()
@@ -121,11 +171,22 @@ def post_medico():
         return {"erro": f"Erro ao criar médico: {str(e)}"}, 500
 
 
+
 @app.route('/medicos/<id>', methods=['PUT'])
+@jwt_required()
 def put_medico(id):
+    """Atualiza dados de um médico. Apenas administradores podem atualizar médicos."""
+    # Verificar se o usuário é admin
+    current_user = get_jwt_identity()
     db = connect_db()
     if db is None:
         return {"erro": "Erro ao conectar ao banco de dados"}, 500
+
+    # Verificar role do usuário
+    users = db['users']
+    user = users.find_one({'username': current_user})
+    if not user or user.get('role') != 'admin':
+        return {"erro": "Apenas administradores podem atualizar médicos"}, 403
 
     try:
         if not ObjectId.is_valid(id):
@@ -159,10 +220,20 @@ def put_medico(id):
 
     
 @app.route('/medicos/<id>', methods=['DELETE'])
+@jwt_required()
 def delete_medico(id):
+    """Remove um médico. Apenas administradores podem remover médicos."""
+    # Verificar se o usuário é admin
+    current_user = get_jwt_identity()
     db = connect_db()
     if db is None:
         return {"erro": "Erro ao conectar ao banco de dados"}, 500
+
+    # Verificar role do usuário
+    users = db['users']
+    user = users.find_one({'username': current_user})
+    if not user or user.get('role') != 'admin':
+        return {"erro": "Apenas administradores podem remover médicos"}, 403
 
     try:
         if not ObjectId.is_valid(id):
@@ -181,6 +252,7 @@ def delete_medico(id):
     
 # PACIENTES
 @app.route('/pacientes', methods=['GET'])
+@jwt_required()
 def get_pacientes():
     db = connect_db()
     if db is None:
@@ -202,8 +274,9 @@ def get_pacientes():
         return {"erro": f"Erro ao consultar pacientes: {str(e)}"}, 500
 
 
-@app.route('/pacientes/<id>', methods=['GET'])
-def get_paciente_id(id):
+@app.route('/pacientes/<paciente_id>', methods=['GET'])
+@jwt_required()
+def get_paciente_id(paciente_id):
     db = connect_db()
     if db is None:
         return {"erro": "Erro ao conectar ao banco de dados"}, 500
@@ -221,6 +294,7 @@ def get_paciente_id(id):
 
 
 @app.route('/pacientes', methods=['POST'])
+@jwt_required()
 def post_paciente():
     db = connect_db()
     if db is None:
@@ -252,8 +326,9 @@ def post_paciente():
         return {"erro": f"Erro ao cadastrar pacient ,.l´ç76e: {str(e)}"}, 500
 
 
-@app.route('/pacientes/<id>', methods=['PUT'])
-def put_paciente(id):
+@app.route('/pacientes/<paciente_id>', methods=['PUT'])
+@jwt_required()
+def put_paciente(paciente_id):
     db = connect_db()
     if db is None:
         return {"erro": "Erro ao conectar ao banco de dados"}, 500
@@ -289,6 +364,7 @@ def put_paciente(id):
     except Exception as e:
         return {"erro": f"Erro ao atualizar paciente: {str(e)}"}, 500
 @app.route('/pacientes/<id>', methods=['DELETE'])
+@jwt_required()
 def delete_paciente(id):
     db = connect_db()
     if db is None:
@@ -311,8 +387,9 @@ def delete_paciente(id):
 
 # MÉDICOS - HORÁRIOS
 @app.route('/medicos/<id>/horarios', methods=['POST'])
+@jwt_required()
 def post_horarios_medico(id):
-    """Cria novos horários (ou dias inteiros) para o médico"""
+    """Cria novos horários (ou dias inteiros) para o médico. Requer autenticação."""
     db = connect_db()
     if db is None:
         return {"erro": "Erro ao conectar ao banco de dados"}, 500
@@ -347,8 +424,9 @@ def post_horarios_medico(id):
 
 
 @app.route('/medicos/<id>/horarios', methods=['GET'])
+@jwt_required()
 def get_horarios_medico(id):
-    """Retorna todos os horários de um médico"""
+    """Retorna todos os horários de um médico. Requer autenticação."""
     db = connect_db()
     if db is None:
         return {"erro": "Erro ao conectar ao banco de dados"}, 500
@@ -370,8 +448,9 @@ def get_horarios_medico(id):
 
 
 @app.route('/medicos/<id>/horarios', methods=['PUT'])
+@jwt_required()
 def put_horarios_medico(id):
-    """Atualiza apenas um horário específico sem alterar os demais"""
+    """Atualiza apenas um horário específico sem alterar os demais. Requer autenticação."""
     db = connect_db()
     if db is None:
         return {"erro": "Erro ao conectar ao banco de dados"}, 500
@@ -404,8 +483,9 @@ def put_horarios_medico(id):
 
 
 @app.route('/medicos/<id>/horarios', methods=['DELETE'])
+@jwt_required()
 def delete_horarios_medico(id):
-    """Remove um horário específico ou um dia inteiro"""
+    """Remove um horário específico ou um dia inteiro. Requer autenticação."""
     db = connect_db()
     if db is None:
         return {"erro": "Erro ao conectar ao banco de dados"}, 500
