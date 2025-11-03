@@ -1,15 +1,20 @@
-from flask import Flask, request
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
 from pymongo import MongoClient
 from dotenv import load_dotenv
 from bson import ObjectId  
 import time
+import jwt
+from datetime import datetime, timedelta
+from functools import wraps
+from flask_bcrypt import Bcrypt
 
 load_dotenv('.cred')
 
 mongo_uri = os.getenv('MONGO_URI', 'mongodb://localhost:27017/')
 db_name = os.getenv('DB_NAME', 'clinica')
+jwt_secret = os.getenv('JWT_SECRET', 'clinica_erp_secret_key_2025')
 
 def connect_db():
     try:
@@ -22,6 +27,103 @@ def connect_db():
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
+bcrypt = Bcrypt(app)
+
+def generate_token(username):
+    """Gera um token JWT para o usuário"""
+    payload = {
+        'username': username,
+        'exp': datetime.utcnow() + timedelta(hours=24),  # Token expira em 24 horas
+        'iat': datetime.utcnow()
+    }
+    token = jwt.encode(payload, jwt_secret, algorithm='HS256')
+    # Garante que retorna string (PyJWT 2.x retorna string diretamente)
+    return token if isinstance(token, str) else token.decode('utf-8')
+
+def token_required(f):
+    """Decorator para proteger rotas que requerem autenticação"""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = None
+        
+        # Verifica se o token foi enviado no header
+        if 'Authorization' in request.headers:
+            auth_header = request.headers['Authorization']
+            try:
+                # Formato esperado: "Bearer <token>"
+                token = auth_header.split(' ')[1]
+            except IndexError:
+                return jsonify({"erro": "Token inválido. Formato esperado: Bearer <token>"}), 401
+        
+        if not token:
+            return jsonify({"erro": "Token de autenticação não fornecido"}), 401
+        
+        try:
+            # Decodifica e valida o token
+            data = jwt.decode(token, jwt_secret, algorithms=['HS256'])
+            current_user = data['username']
+            
+            # Verifica se o usuário existe no banco e é admin
+            db = connect_db()
+            if db is None:
+                return jsonify({"erro": "Erro ao conectar ao banco de dados"}), 500
+            
+            collection = db['admins']
+            admin = collection.find_one({"username": current_user, "role": "admin"})
+            
+            if not admin:
+                return jsonify({"erro": "Acesso negado"}), 403
+                
+        except jwt.ExpiredSignatureError:
+            return jsonify({"erro": "Token expirado"}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({"erro": "Token inválido"}), 401
+        
+        return f(*args, **kwargs)
+    
+    return decorated
+
+@app.route('/auth/login', methods=['POST'])
+def login():
+    """Endpoint de login para admin"""
+    try:
+        dados = request.get_json()
+        
+        if not dados:
+            return jsonify({"erro": "Dados de login não fornecidos"}), 400
+        
+        username = dados.get('username')
+        password = dados.get('password')
+        
+        if not username or not password:
+            return jsonify({"erro": "Username e password são obrigatórios"}), 400
+        
+        # Conecta ao banco de dados
+        db = connect_db()
+        if db is None:
+            return jsonify({"erro": "Erro ao conectar ao banco de dados"}), 500
+        
+        # Busca o admin no banco
+        collection = db['admins']
+        admin = collection.find_one({"username": username, "role": "admin"})
+        
+        if not admin:
+            return jsonify({"erro": "Credenciais inválidas"}), 401
+        
+        # Verifica a senha usando bcrypt
+        if not bcrypt.check_password_hash(admin['password'], password):
+            return jsonify({"erro": "Credenciais inválidas"}), 401
+        
+        # Gera o token JWT
+        token = generate_token(username)
+        return jsonify({
+            "mensagem": "Login realizado com sucesso",
+            "token": token,
+            "username": username
+        }), 200
+    
+    except Exception as e:
+        return jsonify({"erro": f"Erro ao processar login: {str(e)}"}), 500
 
 @app.route('/health', methods=['GET'])
 def health():
@@ -42,6 +144,7 @@ def health():
 
 # Médicos
 @app.route('/medicos', methods=['GET'])
+@token_required
 def get_medicos():
     db = connect_db()
     if db is None:
@@ -62,6 +165,7 @@ def get_medicos():
         return {"erro": f"Erro ao consultar médicos: {str(e)}"}, 500
     
 @app.route('/medicos/<string:id>', methods=['GET'])
+@token_required
 def get_medico_id(id):
     db = connect_db()
     if db is None:
@@ -82,6 +186,7 @@ def get_medico_id(id):
     except Exception as e:
         return {"erro": f"Erro ao consultar médico: {str(e)}"}, 500
 @app.route('/medicos', methods=['POST'])
+@token_required
 def post_medico():
     db = connect_db()
     if db is None:
@@ -122,6 +227,7 @@ def post_medico():
 
 
 @app.route('/medicos/<id>', methods=['PUT'])
+@token_required
 def put_medico(id):
     db = connect_db()
     if db is None:
@@ -159,6 +265,7 @@ def put_medico(id):
 
     
 @app.route('/medicos/<id>', methods=['DELETE'])
+@token_required
 def delete_medico(id):
     db = connect_db()
     if db is None:
@@ -181,6 +288,7 @@ def delete_medico(id):
     
 # PACIENTES
 @app.route('/pacientes', methods=['GET'])
+@token_required
 def get_pacientes():
     db = connect_db()
     if db is None:
@@ -203,6 +311,7 @@ def get_pacientes():
 
 
 @app.route('/pacientes/<id>', methods=['GET'])
+@token_required
 def get_paciente_id(id):
     db = connect_db()
     if db is None:
@@ -221,6 +330,7 @@ def get_paciente_id(id):
 
 
 @app.route('/pacientes', methods=['POST'])
+@token_required
 def post_paciente():
     db = connect_db()
     if db is None:
@@ -253,6 +363,7 @@ def post_paciente():
 
 
 @app.route('/pacientes/<id>', methods=['PUT'])
+@token_required
 def put_paciente(id):
     db = connect_db()
     if db is None:
@@ -289,6 +400,7 @@ def put_paciente(id):
     except Exception as e:
         return {"erro": f"Erro ao atualizar paciente: {str(e)}"}, 500
 @app.route('/pacientes/<id>', methods=['DELETE'])
+@token_required
 def delete_paciente(id):
     db = connect_db()
     if db is None:
@@ -311,6 +423,7 @@ def delete_paciente(id):
 
 # MÉDICOS - HORÁRIOS
 @app.route('/medicos/<id>/horarios', methods=['POST'])
+@token_required
 def post_horarios_medico(id):
     """Cria novos horários (ou dias inteiros) para o médico"""
     db = connect_db()
@@ -347,6 +460,7 @@ def post_horarios_medico(id):
 
 
 @app.route('/medicos/<id>/horarios', methods=['GET'])
+@token_required
 def get_horarios_medico(id):
     """Retorna todos os horários de um médico"""
     db = connect_db()
@@ -370,6 +484,7 @@ def get_horarios_medico(id):
 
 
 @app.route('/medicos/<id>/horarios', methods=['PUT'])
+@token_required
 def put_horarios_medico(id):
     """Atualiza apenas um horário específico sem alterar os demais"""
     db = connect_db()
@@ -404,6 +519,7 @@ def put_horarios_medico(id):
 
 
 @app.route('/medicos/<id>/horarios', methods=['DELETE'])
+@token_required
 def delete_horarios_medico(id):
     """Remove um horário específico ou um dia inteiro"""
     db = connect_db()
@@ -440,6 +556,7 @@ def delete_horarios_medico(id):
     
 # PACIENTES -  CONSULTAS
 @app.route('/pacientes/<id>/consultas', methods=['POST'])
+@token_required
 def post_consultas_paciente(id):
     db = connect_db()
     if db is None:
@@ -475,6 +592,7 @@ def post_consultas_paciente(id):
 
 
 @app.route('/pacientes/<id>/consultas', methods=['GET'])
+@token_required
 def get_consultas_paciente(id):
     db = connect_db()
     if db is None:
@@ -497,6 +615,7 @@ def get_consultas_paciente(id):
 
 
 @app.route('/pacientes/<id>/consultas', methods=['PUT'])
+@token_required
 def put_consultas_paciente(id):
     db = connect_db()
     if db is None:
@@ -531,6 +650,7 @@ def put_consultas_paciente(id):
 
 
 @app.route('/pacientes/<id>/consultas', methods=['DELETE'])
+@token_required
 def delete_consulta_paciente(id):
     db = connect_db()
     if db is None:
