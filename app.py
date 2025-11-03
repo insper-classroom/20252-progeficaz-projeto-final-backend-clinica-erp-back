@@ -8,6 +8,7 @@ import time
 import jwt
 from datetime import datetime, timedelta
 from functools import wraps
+from flask_bcrypt import Bcrypt
 
 load_dotenv('.cred')
 
@@ -26,10 +27,7 @@ def connect_db():
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
-
-# Credenciais do admin
-ADMIN_USERNAME = 'admin'
-ADMIN_PASSWORD = 'Admin@123'
+bcrypt = Bcrypt(app)
 
 def generate_token(username):
     """Gera um token JWT para o usuário"""
@@ -65,8 +63,15 @@ def token_required(f):
             data = jwt.decode(token, jwt_secret, algorithms=['HS256'])
             current_user = data['username']
             
-            # Verifica se é o admin
-            if current_user != ADMIN_USERNAME:
+            # Verifica se o usuário existe no banco e é admin
+            db = connect_db()
+            if db is None:
+                return jsonify({"erro": "Erro ao conectar ao banco de dados"}), 500
+            
+            collection = db['admins']
+            admin = collection.find_one({"username": current_user, "role": "admin"})
+            
+            if not admin:
                 return jsonify({"erro": "Acesso negado"}), 403
                 
         except jwt.ExpiredSignatureError:
@@ -93,16 +98,29 @@ def login():
         if not username or not password:
             return jsonify({"erro": "Username e password são obrigatórios"}), 400
         
-        # Valida credenciais
-        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
-            token = generate_token(username)
-            return jsonify({
-                "mensagem": "Login realizado com sucesso",
-                "token": token,
-                "username": username
-            }), 200
-        else:
+        # Conecta ao banco de dados
+        db = connect_db()
+        if db is None:
+            return jsonify({"erro": "Erro ao conectar ao banco de dados"}), 500
+        
+        # Busca o admin no banco
+        collection = db['admins']
+        admin = collection.find_one({"username": username, "role": "admin"})
+        
+        if not admin:
             return jsonify({"erro": "Credenciais inválidas"}), 401
+        
+        # Verifica a senha usando bcrypt
+        if not bcrypt.check_password_hash(admin['password'], password):
+            return jsonify({"erro": "Credenciais inválidas"}), 401
+        
+        # Gera o token JWT
+        token = generate_token(username)
+        return jsonify({
+            "mensagem": "Login realizado com sucesso",
+            "token": token,
+            "username": username
+        }), 200
     
     except Exception as e:
         return jsonify({"erro": f"Erro ao processar login: {str(e)}"}), 500
