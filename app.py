@@ -1,15 +1,19 @@
-from flask import Flask, request
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
 from pymongo import MongoClient
 from dotenv import load_dotenv
 from bson import ObjectId  
 import time
+import jwt
+from datetime import datetime, timedelta
+from functools import wraps
 
 load_dotenv('.cred')
 
 mongo_uri = os.getenv('MONGO_URI', 'mongodb://localhost:27017/')
 db_name = os.getenv('DB_NAME', 'clinica')
+jwt_secret = os.getenv('JWT_SECRET', 'clinica_erp_secret_key_2025')
 
 def connect_db():
     try:
@@ -22,6 +26,86 @@ def connect_db():
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
+
+# Credenciais do admin
+ADMIN_USERNAME = 'admin'
+ADMIN_PASSWORD = 'Admin@123'
+
+def generate_token(username):
+    """Gera um token JWT para o usuário"""
+    payload = {
+        'username': username,
+        'exp': datetime.utcnow() + timedelta(hours=24),  # Token expira em 24 horas
+        'iat': datetime.utcnow()
+    }
+    token = jwt.encode(payload, jwt_secret, algorithm='HS256')
+    # Garante que retorna string (PyJWT 2.x retorna string diretamente)
+    return token if isinstance(token, str) else token.decode('utf-8')
+
+def token_required(f):
+    """Decorator para proteger rotas que requerem autenticação"""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = None
+        
+        # Verifica se o token foi enviado no header
+        if 'Authorization' in request.headers:
+            auth_header = request.headers['Authorization']
+            try:
+                # Formato esperado: "Bearer <token>"
+                token = auth_header.split(' ')[1]
+            except IndexError:
+                return jsonify({"erro": "Token inválido. Formato esperado: Bearer <token>"}), 401
+        
+        if not token:
+            return jsonify({"erro": "Token de autenticação não fornecido"}), 401
+        
+        try:
+            # Decodifica e valida o token
+            data = jwt.decode(token, jwt_secret, algorithms=['HS256'])
+            current_user = data['username']
+            
+            # Verifica se é o admin
+            if current_user != ADMIN_USERNAME:
+                return jsonify({"erro": "Acesso negado"}), 403
+                
+        except jwt.ExpiredSignatureError:
+            return jsonify({"erro": "Token expirado"}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({"erro": "Token inválido"}), 401
+        
+        return f(*args, **kwargs)
+    
+    return decorated
+
+@app.route('/auth/login', methods=['POST'])
+def login():
+    """Endpoint de login para admin"""
+    try:
+        dados = request.get_json()
+        
+        if not dados:
+            return jsonify({"erro": "Dados de login não fornecidos"}), 400
+        
+        username = dados.get('username')
+        password = dados.get('password')
+        
+        if not username or not password:
+            return jsonify({"erro": "Username e password são obrigatórios"}), 400
+        
+        # Valida credenciais
+        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+            token = generate_token(username)
+            return jsonify({
+                "mensagem": "Login realizado com sucesso",
+                "token": token,
+                "username": username
+            }), 200
+        else:
+            return jsonify({"erro": "Credenciais inválidas"}), 401
+    
+    except Exception as e:
+        return jsonify({"erro": f"Erro ao processar login: {str(e)}"}), 500
 
 @app.route('/health', methods=['GET'])
 def health():
