@@ -80,6 +80,153 @@ A API estará disponível em `http://localhost:5000`
 
 ---
 
+## Autenticação JWT
+
+A API utiliza autenticação JWT (JSON Web Token) para proteger as rotas. Todas as rotas, exceto `/auth/login` e `/health`, requerem um token válido.
+
+### Criar Usuário Admin
+
+Antes de usar a API, é necessário criar o usuário admin no banco de dados:
+
+```bash
+python create_admin.py
+```
+
+Este script criará um admin com:
+- **Username:** `admin`
+- **Password:** `Admin@123`
+- **Role:** `admin`
+
+O script é idempotente - pode ser executado múltiplas vezes sem criar duplicatas.
+
+### Login
+
+Para obter um token JWT, faça uma requisição de login:
+
+```http
+POST http://localhost:5000/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "Admin@123"
+}
+```
+
+**Resposta de sucesso (200):**
+```json
+{
+  "mensagem": "Login realizado com sucesso",
+  "token": "eyJ0eXAiOiJKV1QiLCJhbGc...",
+  "username": "admin"
+}
+```
+
+**Resposta de erro (401):**
+```json
+{
+  "erro": "Credenciais inválidas"
+}
+```
+
+### Usar o Token nas Requisições
+
+Todas as requisições para rotas protegidas devem incluir o token JWT no header `Authorization`:
+
+```http
+Authorization: Bearer <seu_token_jwt>
+```
+
+**Exemplo completo:**
+
+```http
+GET http://localhost:5000/medicos
+Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGc...
+Content-Type: application/json
+```
+
+### Token Expiração
+
+- O token JWT expira em **24 horas** após a geração
+- Após expirar, será necessário fazer login novamente
+- Se uma requisição retornar erro 401 (não autorizado), faça login novamente para obter um novo token
+
+### Rotas Protegidas
+
+Todas as rotas abaixo requerem autenticação JWT:
+
+- **Médicos:** GET, POST, PUT, DELETE `/medicos` e `/medicos/<id>`
+- **Horários:** GET, POST, PUT, DELETE `/medicos/<id>/horarios`
+- **Pacientes:** GET, POST, PUT, DELETE `/pacientes` e `/pacientes/<id>`
+- **Consultas:** GET, POST, PUT, DELETE `/pacientes/<id>/consultas`
+
+### Rotas Públicas
+
+As seguintes rotas não requerem autenticação:
+
+- `POST /auth/login` - Login
+- `GET /health` - Health check
+
+### Exemplos com cURL
+
+**Login:**
+```bash
+curl -X POST http://localhost:5000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"Admin@123"}'
+```
+
+**Usar token em requisição:**
+```bash
+curl -X GET http://localhost:5000/medicos \
+  -H "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGc..." \
+  -H "Content-Type: application/json"
+```
+
+### Exemplos com JavaScript (Fetch)
+
+```javascript
+// Login
+const loginResponse = await fetch('http://localhost:5000/auth/login', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    username: 'admin',
+    password: 'Admin@123'
+  })
+});
+
+const loginData = await loginResponse.json();
+const token = loginData.token;
+
+// Usar token em requisições protegidas
+const medicosResponse = await fetch('http://localhost:5000/medicos', {
+  method: 'GET',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  }
+});
+
+const medicos = await medicosResponse.json();
+```
+
+### Erros de Autenticação
+
+**401 Unauthorized:**
+- Token não fornecido
+- Token inválido
+- Token expirado
+- Credenciais inválidas no login
+
+**403 Forbidden:**
+- Usuário não é admin
+- Token válido mas sem permissões
+
+---
+
 ## Postman Collection
 
 Para facilitar o teste da API, disponibilizamos uma collection do Postman com todos os endpoints configurados.
@@ -102,8 +249,14 @@ Crie uma nova collection no Postman chamada "Clinica ERP API" com a seguinte est
 
 **Variáveis da Collection:**
 - `base_url`: `http://localhost:5000`
+- `token`: (será preenchido após fazer login - veja seção Autenticação JWT)
 - `medico_id`: (será preenchido após criar um médico)
 - `paciente_id`: (será preenchido após criar um paciente)
+
+**Importante:** Para usar a collection no Postman, primeiro:
+1. Faça login em `POST /auth/login` para obter o token
+2. Salve o token na variável `token` da collection
+3. Configure o header `Authorization: Bearer {{token}}` em todas as requisições protegidas
 
 **Pastas e Endpoints:**
 
@@ -111,6 +264,8 @@ Crie uma nova collection no Postman chamada "Clinica ERP API" com a seguinte est
 📁 Clinica ERP API
   📁 Health Check
     ├─ GET Health Check
+  📁 Autenticação
+    ├─ POST Login
   📁 Médicos
     ├─ GET Listar Médicos
     ├─ GET Buscar Médico por ID
@@ -145,6 +300,7 @@ GET {{base_url}}/health
 #### Criar Médico
 ```http
 POST {{base_url}}/medicos
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
@@ -155,9 +311,12 @@ Content-Type: application/json
 }
 ```
 
+**Nota:** Substitua `{{token}}` pelo token JWT obtido no login. No Postman, você pode criar uma variável de ambiente `token` para facilitar.
+
 #### Adicionar Horários
 ```http
 POST {{base_url}}/medicos/{{medico_id}}/horarios
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
@@ -172,6 +331,7 @@ Content-Type: application/json
 #### Criar Paciente
 ```http
 POST {{base_url}}/pacientes
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
@@ -185,6 +345,7 @@ Content-Type: application/json
 #### Agendar Consulta
 ```http
 POST {{base_url}}/pacientes/{{paciente_id}}/consultas
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
