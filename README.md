@@ -4,6 +4,7 @@
 
 API REST desenvolvida em Flask para gerenciamento de clínicas médicas. O sistema permite o cadastro e gestão de médicos, pacientes, horários de atendimento e consultas agendadas.
 
+**Deploy** 34.226.205.72 (api - backend)
 **Base URL:** `http://localhost:5000`
 
 **Banco de Dados:** MongoDB
